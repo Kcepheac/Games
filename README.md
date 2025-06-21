@@ -1,0 +1,1 @@
+These games are made using AI tools and also with the help of some websites found on the internet. These have been made to become a compilation of sorts. The following games need the installation of pygame.
