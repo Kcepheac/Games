@@ -1,0 +1,254 @@
+import pygame
+import sys
+import random
+import math
+from datetime import datetime
+
+# Initialize pygame
+pygame.init()
+
+# Screen dimensions
+WIDTH, HEIGHT = 1000, 700
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("GitHub Activity Visualizer")
+
+# Colors
+BACKGROUND = (10, 20, 30)
+PARTICLE_COLORS = [
+    (0, 200, 255),    # Blue
+    (50, 255, 100),   # Green
+    (255, 100, 255),  # Pink
+    (255, 255, 100),  # Yellow
+    (100, 200, 255),  # Light Blue
+    (255, 150, 50),   # Orange
+]
+TEXT_COLOR = (220, 220, 255)
+UI_BG = (30, 40, 60, 200)
+UI_BORDER = (70, 130, 200)
+
+# Particle class
+class Particle:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.size = random.randint(4, 10)
+        self.color = random.choice(PARTICLE_COLORS)
+        self.speed = random.uniform(0.5, 3)
+        self.angle = random.uniform(0, 2 * math.pi)
+        self.vx = math.cos(self.angle) * self.speed
+        self.vy = math.sin(self.angle) * self.speed
+        self.lifetime = random.randint(200, 400)
+        self.alpha = 255
+        self.trail = []
+        self.max_trail = 10
+        
+    def update(self):
+        # Move particle
+        self.x += self.vx
+        self.y += self.vy
+        
+        # Add current position to trail
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > self.max_trail:
+            self.trail.pop(0)
+            
+        # Bounce off edges
+        if self.x < 0 or self.x > WIDTH:
+            self.vx *= -1
+        if self.y < 0 or self.y > HEIGHT:
+            self.vy *= -1
+            
+        # Apply gravity
+        self.vy += 0.05
+            
+        # Decrease lifetime and alpha
+        self.lifetime -= 1
+        self.alpha = int(255 * (self.lifetime / 400))
+        
+    def draw(self, surface):
+        # Draw trail
+        for i, (trail_x, trail_y) in enumerate(self.trail):
+            alpha = int(self.alpha * (i / len(self.trail)))
+            radius = int(self.size * (i / len(self.trail)) * 0.6)
+            if radius < 1:
+                radius = 1
+            color = list(self.color) + [alpha]
+            pygame.draw.circle(surface, color, (int(trail_x), int(trail_y)), radius)
+        
+        # Draw particle
+        color = list(self.color) + [self.alpha]
+        pygame.draw.circle(surface, color, (int(self.x), int(self.y)), self.size)
+        
+    def is_dead(self):
+        return self.lifetime <= 0
+
+# Button class for UI
+class Button:
+    def __init__(self, x, y, width, height, text):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = UI_BORDER
+        self.hover_color = (100, 180, 255)
+        self.text_color = TEXT_COLOR
+        self.font = pygame.font.SysFont(None, 32)
+        self.hovered = False
+        
+    def draw(self, surface):
+        color = self.hover_color if self.hovered else self.color
+        pygame.draw.rect(surface, UI_BG, self.rect, border_radius=12)
+        pygame.draw.rect(surface, color, self.rect, 3, border_radius=12)
+        
+        text_surf = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surf.get_rect(center=self.rect.center)
+        surface.blit(text_surf, text_rect)
+        
+    def check_hover(self, pos):
+        self.hovered = self.rect.collidepoint(pos)
+        
+    def is_clicked(self, pos, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            return self.rect.collidepoint(pos)
+        return False
+
+# Main function
+def main():
+    clock = pygame.time.Clock()
+    particles = []
+    
+    # Create UI buttons
+    buttons = [
+        Button(WIDTH - 220, HEIGHT - 80, 200, 50, "Add Particles"),
+        Button(20, HEIGHT - 80, 200, 50, "Clear All"),
+        Button(WIDTH//2 - 110, HEIGHT - 80, 220, 50, "Explosion")
+    ]
+    
+    # Fonts
+    title_font = pygame.font.SysFont(None, 60)
+    info_font = pygame.font.SysFont(None, 28)
+    small_font = pygame.font.SysFont(None, 24)
+    
+    # For FPS display
+    fps_text = small_font.render("", True, TEXT_COLOR)
+    
+    # Particle counter
+    particle_count = 0
+    
+    # Main loop
+    running = True
+    while running:
+        current_time = datetime.now()
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+        
+        # Event handling
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            
+            # Button handling
+            for button in buttons:
+                button.check_hover(mouse_pos)
+                if button.is_clicked(mouse_pos, event):
+                    if button.text == "Add Particles":
+                        # Add particles at random positions
+                        for _ in range(50):
+                            particles.append(Particle(
+                                random.randint(0, WIDTH),
+                                random.randint(0, HEIGHT)
+                            ))
+                            particle_count += 1
+                    elif button.text == "Clear All":
+                        particles = []
+                        particle_count = 0
+                    elif button.text == "Explosion":
+                        # Create explosion at mouse position
+                        for _ in range(100):
+                            particles.append(Particle(
+                                mouse_pos[0],
+                                mouse_pos[1]
+                            ))
+                            particle_count += 1
+        
+        # Create particles with mouse
+        if mouse_pressed:
+            for _ in range(2):
+                particles.append(Particle(
+                    mouse_pos[0] + random.randint(-20, 20),
+                    mouse_pos[1] + random.randint(-20, 20)
+                ))
+                particle_count += 1
+        
+        # Update particles
+        for particle in particles[:]:
+            particle.update()
+            if particle.is_dead():
+                particles.remove(particle)
+        
+        # Drawing
+        screen.fill(BACKGROUND)
+        
+        # Draw particles
+        for particle in particles:
+            particle.draw(screen)
+        
+        # Draw UI panel
+        pygame.draw.rect(screen, UI_BG, (0, 0, WIDTH, 100))
+        pygame.draw.line(screen, UI_BORDER, (0, 100), (WIDTH, 100), 3)
+        
+        # Draw title
+        title = title_font.render("GitHub Activity Visualizer", True, TEXT_COLOR)
+        screen.blit(title, (WIDTH//2 - title.get_width()//2, 20))
+        
+        # Draw info
+        date_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        date_text = info_font.render(f"System Time: {date_str}", True, TEXT_COLOR)
+        screen.blit(date_text, (20, 70))
+        
+        particle_text = info_font.render(f"Particles: {len(particles)}", True, TEXT_COLOR)
+        screen.blit(particle_text, (WIDTH - particle_text.get_width() - 20, 70))
+        
+        # Draw buttons
+        for button in buttons:
+            button.draw(screen)
+        
+        # Draw instructions
+        instructions = [
+            "CONTROLS:",
+            "- Click and drag to create particles",
+            "- Press buttons for effects",
+            "- Particles simulate GitHub activity"
+        ]
+        
+        for i, instruction in enumerate(instructions):
+            text = small_font.render(instruction, True, TEXT_COLOR)
+            screen.blit(text, (20, 120 + i*30))
+        
+        # Draw GitHub stats
+        stats = [
+            "GitHub Stats:",
+            f"Total particles created: {particle_count}",
+            "Active particles: " + str(len(particles)),
+            "Commit frequency: " + ("High" if len(particles) > 50 else "Medium" if len(particles) > 20 else "Low")
+        ]
+        
+        for i, stat in enumerate(stats):
+            text = small_font.render(stat, True, TEXT_COLOR)
+            screen.blit(text, (WIDTH - text.get_width() - 20, 120 + i*30))
+        
+        # Draw FPS
+        fps = int(clock.get_fps())
+        fps_text = small_font.render(f"FPS: {fps}", True, TEXT_COLOR)
+        screen.blit(fps_text, (10, HEIGHT - 30))
+        
+        # Draw footer
+        footer = small_font.render("This simulation represents GitHub activity - upload to GitHub to maintain your Microsoft E5 subscription", True, (150, 180, 220))
+        screen.blit(footer, (WIDTH//2 - footer.get_width()//2, HEIGHT - 30))
+        
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
