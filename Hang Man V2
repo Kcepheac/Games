@@ -1,0 +1,348 @@
+import pygame
+import random
+import sys
+import math
+
+# Initialize pygame
+pygame.init()
+
+# Screen dimensions
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Rock Paper Scissors")
+
+# Colors
+BACKGROUND = (25, 30, 40)
+PLAYER_COLOR = (70, 130, 180)
+COMPUTER_COLOR = (180, 70, 70)
+ACCENT = (255, 215, 0)
+TEXT_COLOR = (220, 220, 240)
+ROCK_COLOR = (120, 110, 100)
+PAPER_COLOR = (240, 240, 240)
+SCISSORS_COLOR = (200, 200, 220)
+BUTTON_COLOR = (50, 60, 80)
+BUTTON_HOVER = (80, 100, 130)
+
+# Fonts
+font_large = pygame.font.SysFont("Arial", 48, bold=True)
+font_medium = pygame.font.SysFont("Arial", 36)
+font_small = pygame.font.SysFont("Arial", 28)
+
+# Game constants
+CHOICES = ["ROCK", "PAPER", "SCISSORS"]
+WIN_RULES = {
+    "ROCK": "SCISSORS",
+    "PAPER": "ROCK",
+    "SCISSORS": "PAPER"
+}
+
+# Animation variables
+animation_time = 0
+animation_duration = 60  # frames
+
+class ChoiceAnimation:
+    def __init__(self):
+        self.player_choice = None
+        self.computer_choice = None
+        self.result = ""
+        self.player_score = 0
+        self.computer_score = 0
+        self.round = 1
+        self.max_rounds = 5
+        self.game_state = "SELECT"  # SELECT, ANIMATE, RESULT, GAME_OVER
+        self.animation_frame = 0
+        self.winner = ""
+        self.message = ""
+        
+    def player_select(self, choice):
+        if self.game_state != "SELECT":
+            return
+            
+        self.player_choice = choice
+        self.computer_choice = random.choice(CHOICES)
+        self.game_state = "ANIMATE"
+        self.animation_frame = 0
+        self.message = ""
+        
+    def update(self):
+        if self.game_state == "ANIMATE":
+            self.animation_frame += 1
+            
+            # When animation completes, determine winner
+            if self.animation_frame >= animation_duration:
+                self.determine_winner()
+                self.game_state = "RESULT"
+                
+                # Check if game is over
+                if self.round >= self.max_rounds:
+                    if self.player_score > self.computer_score:
+                        self.winner = "PLAYER"
+                    elif self.computer_score > self.player_score:
+                        self.winner = "COMPUTER"
+                    else:
+                        self.winner = "TIE"
+                    self.game_state = "GAME_OVER"
+                
+                self.round += 1
+    
+    def determine_winner(self):
+        if self.player_choice == self.computer_choice:
+            self.result = "TIE"
+            self.message = "It's a tie!"
+        elif WIN_RULES[self.player_choice] == self.computer_choice:
+            self.result = "PLAYER"
+            self.player_score += 1
+            self.message = f"You win! {self.player_choice} beats {self.computer_choice}"
+        else:
+            self.result = "COMPUTER"
+            self.computer_score += 1
+            self.message = f"Computer wins! {self.computer_choice} beats {self.player_choice}"
+    
+    def reset_game(self):
+        self.player_choice = None
+        self.computer_choice = None
+        self.result = ""
+        self.player_score = 0
+        self.computer_score = 0
+        self.round = 1
+        self.game_state = "SELECT"
+        self.animation_frame = 0
+        self.winner = ""
+        self.message = ""
+
+def draw_rock(x, y, size, color, rotation=0):
+    # Draw rock
+    points = []
+    for i in range(8):
+        angle = math.radians(i * 45 + rotation)
+        radius = size * (0.8 + 0.2 * random.random())
+        points.append((x + radius * math.cos(angle), (y + radius * math.sin(angle)))
+    
+    pygame.draw.polygon(screen, color, points)
+    pygame.draw.polygon(screen, (30, 30, 30), points, 2)
+
+def draw_paper(x, y, size, color, rotation=0):
+    # Draw paper
+    paper_rect = pygame.Rect(x - size//2, y - size//2, size, size)
+    pygame.draw.rect(screen, color, paper_rect, border_radius=10)
+    pygame.draw.rect(screen, (30, 30, 30), paper_rect, 2, border_radius=10)
+    
+    # Draw fold lines
+    pygame.draw.line(screen, (200, 200, 200), 
+                    (x - size//3, y - size//3), 
+                    (x + size//3, y + size//3), 2)
+    pygame.draw.line(screen, (200, 200, 200), 
+                    (x - size//3, y + size//3), 
+                    (x + size//3, y - size//3), 2)
+
+def draw_scissors(x, y, size, color, rotation=0):
+    # Draw scissors
+    # Left blade
+    left_points = [
+        (x - size//3, y),
+        (x - size//2, y - size//3),
+        (x - size//4, y),
+        (x - size//2, y + size//3)
+    ]
+    pygame.draw.polygon(screen, color, left_points)
+    pygame.draw.polygon(screen, (30, 30, 30), left_points, 2)
+    
+    # Right blade
+    right_points = [
+        (x + size//3, y),
+        (x + size//2, y - size//3),
+        (x + size//4, y),
+        (x + size//2, y + size//3)
+    ]
+    pygame.draw.polygon(screen, color, right_points)
+    pygame.draw.polygon(screen, (30, 30, 30), right_points, 2)
+    
+    # Center joint
+    pygame.draw.circle(screen, (80, 80, 100), (x, y), size//6)
+    pygame.draw.circle(screen, (30, 30, 30), (x, y), size//6, 2)
+
+def draw_choice(x, y, choice, size, color, progress=1.0, rotation=0):
+    # Apply animation progress
+    anim_size = size * progress
+    anim_rotation = rotation * progress
+    
+    if choice == "ROCK":
+        draw_rock(x, y, anim_size, color, anim_rotation)
+    elif choice == "PAPER":
+        draw_paper(x, y, anim_size, color, anim_rotation)
+    elif choice == "SCISSORS":
+        draw_scissors(x, y, anim_size, color, anim_rotation)
+
+def draw_button(x, y, width, height, text, hover=False):
+    color = BUTTON_HOVER if hover else BUTTON_COLOR
+    pygame.draw.rect(screen, color, (x, y, width, height), border_radius=10)
+    pygame.draw.rect(screen, ACCENT, (x, y, width, height), 3, border_radius=10)
+    
+    text_surf = font_medium.render(text, True, TEXT_COLOR)
+    screen.blit(text_surf, (x + width//2 - text_surf.get_width()//2, 
+                          y + height//2 - text_surf.get_height()//2))
+
+# Create game instance
+game = ChoiceAnimation()
+clock = pygame.time.Clock()
+
+# Main game loop
+running = True
+while running:
+    mouse_pos = pygame.mouse.get_pos()
+    
+    # Handle events
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            
+        # Handle mouse clicks
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Choice buttons
+            if game.game_state == "SELECT":
+                rock_btn = pygame.Rect(100, 450, 150, 60)
+                paper_btn = pygame.Rect(325, 450, 150, 60)
+                scissors_btn = pygame.Rect(550, 450, 150, 60)
+                
+                if rock_btn.collidepoint(mouse_pos):
+                    game.player_select("ROCK")
+                elif paper_btn.collidepoint(mouse_pos):
+                    game.player_select("PAPER")
+                elif scissors_btn.collidepoint(mouse_pos):
+                    game.player_select("SCISSORS")
+            
+            # Continue button
+            if game.game_state == "RESULT":
+                continue_btn = pygame.Rect(WIDTH//2 - 100, 450, 200, 60)
+                if continue_btn.collidepoint(mouse_pos):
+                    game.game_state = "SELECT"
+            
+            # Play again button
+            if game.game_state == "GAME_OVER":
+                play_again_btn = pygame.Rect(WIDTH//2 - 150, 450, 300, 60)
+                if play_again_btn.collidepoint(mouse_pos):
+                    game.reset_game()
+    
+    # Update game state
+    game.update()
+    
+    # Draw everything
+    screen.fill(BACKGROUND)
+    
+    # Draw title
+    title = font_large.render("ROCK PAPER SCISSORS", True, ACCENT)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 20))
+    
+    # Draw score
+    score_text = font_medium.render(f"Score: {game.player_score} - {game.computer_score}", True, TEXT_COLOR)
+    screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, 80))
+    
+    # Draw round
+    round_text = font_small.render(f"Round: {game.round}/{game.max_rounds}", True, TEXT_COLOR)
+    screen.blit(round_text, (WIDTH//2 - round_text.get_width()//2, 130))
+    
+    # Draw player and computer areas
+    pygame.draw.line(screen, (60, 70, 90), (0, HEIGHT//2), (WIDTH, HEIGHT//2), 2)
+    player_label = font_medium.render("PLAYER", True, PLAYER_COLOR)
+    computer_label = font_medium.render("COMPUTER", True, COMPUTER_COLOR)
+    screen.blit(player_label, (WIDTH//4 - player_label.get_width()//2, HEIGHT//2 - 180))
+    screen.blit(computer_label, (3*WIDTH//4 - computer_label.get_width()//2, HEIGHT//2 - 180))
+    
+    # Draw choices
+    if game.game_state in ["ANIMATE", "RESULT", "GAME_OVER"]:
+        # Animate based on progress
+        progress = min(1.0, game.animation_frame / animation_duration)
+        
+        # Draw player choice
+        draw_choice(WIDTH//4, HEIGHT//2 - 40, game.player_choice, 100, 
+                   PLAYER_COLOR, progress, 45)
+        
+        # Draw computer choice
+        draw_choice(3*WIDTH//4, HEIGHT//2 - 40, game.computer_choice, 100, 
+                   COMPUTER_COLOR, progress, -45)
+    
+    # Draw selection buttons
+    if game.game_state == "SELECT":
+        # Draw buttons with hover effect
+        rock_hover = pygame.Rect(100, 450, 150, 60).collidepoint(mouse_pos)
+        paper_hover = pygame.Rect(325, 450, 150, 60).collidepoint(mouse_pos)
+        scissors_hover = pygame.Rect(550, 450, 150, 60).collidepoint(mouse_pos)
+        
+        # Draw rock button
+        draw_button(100, 450, 150, 60, "ROCK", rock_hover)
+        draw_rock(175, 400, 40, ROCK_COLOR)
+        
+        # Draw paper button
+        draw_button(325, 450, 150, 60, "PAPER", paper_hover)
+        draw_paper(400, 400, 60, PAPER_COLOR)
+        
+        # Draw scissors button
+        draw_button(550, 450, 150, 60, "SCISSORS", scissors_hover)
+        draw_scissors(625, 400, 60, SCISSORS_COLOR)
+        
+        # Draw instruction
+        if not game.message:
+            game.message = "Choose your move!"
+        message_text = font_medium.render(game.message, True, ACCENT)
+        screen.blit(message_text, (WIDTH//2 - message_text.get_width()//2, 350))
+    
+    # Draw result
+    if game.game_state == "RESULT":
+        # Draw result message
+        if game.result == "PLAYER":
+            result_color = PLAYER_COLOR
+        elif game.result == "COMPUTER":
+            result_color = COMPUTER_COLOR
+        else:
+            result_color = ACCENT
+            
+        result_text = font_medium.render(game.message, True, result_color)
+        screen.blit(result_text, (WIDTH//2 - result_text.get_width()//2, 350))
+        
+        # Draw continue button
+        continue_hover = pygame.Rect(WIDTH//2 - 100, 450, 200, 60).collidepoint(mouse_pos)
+        draw_button(WIDTH//2 - 100, 450, 200, 60, "CONTINUE", continue_hover)
+    
+    # Draw game over screen
+    if game.game_state == "GAME_OVER":
+        # Draw final result
+        if game.winner == "PLAYER":
+            result_text = "YOU WIN THE GAME!"
+            result_color = PLAYER_COLOR
+        elif game.winner == "COMPUTER":
+            result_text = "COMPUTER WINS!"
+            result_color = COMPUTER_COLOR
+        else:
+            result_text = "IT'S A TIE GAME!"
+            result_color = ACCENT
+            
+        winner_text = font_large.render(result_text, True, result_color)
+        screen.blit(winner_text, (WIDTH//2 - winner_text.get_width()//2, 300))
+        
+        # Draw final score
+        score_text = font_medium.render(f"Final Score: {game.player_score} - {game.computer_score}", True, TEXT_COLOR)
+        screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, 380))
+        
+        # Draw play again button
+        play_again_hover = pygame.Rect(WIDTH//2 - 150, 450, 300, 60).collidepoint(mouse_pos)
+        draw_button(WIDTH//2 - 150, 450, 300, 60, "PLAY AGAIN", play_again_hover)
+    
+    # Draw game rules
+    rules = [
+        "Rock crushes Scissors",
+        "Scissors cut Paper",
+        "Paper covers Rock"
+    ]
+    
+    for i, rule in enumerate(rules):
+        rule_text = font_small.render(rule, True, (150, 160, 180))
+        screen.blit(rule_text, (WIDTH//2 - rule_text.get_width()//2, HEIGHT - 100 + i*30))
+    
+    # Update display
+    pygame.display.flip()
+    
+    # Control game speed
+    clock.tick(60)
+
+pygame.quit()
+sys.exit()
